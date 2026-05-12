@@ -1,0 +1,234 @@
+СПРАВОЧНИК
+
+1. СТРУКТУРА БАЗЫ ДАННЫХ
+
+Таблица users (стандарт для всех билетов):
+- id INT AUTO_INCREMENT PRIMARY KEY
+- login VARCHAR(50) UNIQUE NOT NULL
+- password VARCHAR(255) NOT NULL
+- fio VARCHAR(100) NOT NULL
+- phone VARCHAR(20) NOT NULL
+- email VARCHAR(100) NOT NULL
+- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+Таблица requests (базовая структура):
+- id INT AUTO_INCREMENT PRIMARY KEY
+- user_id INT NOT NULL
+- status VARCHAR(50) DEFAULT 'new'
+- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+
+Таблица reviews (опционально):
+- id INT AUTO_INCREMENT PRIMARY KEY
+- user_id INT NOT NULL
+- request_id INT NOT NULL
+- rating INT CHECK (rating BETWEEN 1 AND 5)
+- comment TEXT
+- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- FOREIGN KEY (user_id) REFERENCES users(id)
+- FOREIGN KEY (request_id) REFERENCES requests(id)
+
+2. SQL-ЗАПРОСЫ
+
+Выборка заявок с данными пользователя:
+SELECT r.*, u.fio, u.email, u.phone FROM requests r JOIN users u ON r.user_id = u.id ORDER BY r.created_at DESC
+
+Выборка заявок конкретного пользователя:
+SELECT * FROM requests WHERE user_id = ? ORDER BY created_at DESC
+
+Вставка новой заявки:
+INSERT INTO requests (user_id, поле1, поле2, status) VALUES (?, ?, ?, 'new')
+
+Обновление статуса:
+UPDATE requests SET status = ? WHERE id = ?
+
+Удаление заявки:
+DELETE FROM requests WHERE id = ? AND user_id = ?
+
+Статистика по статусам:
+SELECT status, COUNT(*) FROM requests GROUP BY status
+
+Пользователь оставил отзыв:
+UPDATE requests SET review = ? WHERE id = ? AND user_id = ?
+
+3. ПРАВИЛА ВАЛИДАЦИИ ПОЛЕЙ
+
+Логин: латиница и цифры, минимум 6 символов
+Код: preg_match('/^[a-zA-Z0-9]{6,}$/', $login)
+
+Пароль: минимум 8 символов
+Код: strlen($password) >= 8
+
+ФИО: только буквы (русские или английские) и пробелы
+Код: preg_match('/^[а-яА-ЯёЁa-zA-Z ]+$/u', $fio)
+
+Телефон: формат 8(XXX)XXX-XX-XX
+Код: preg_match('/^8\(\d{3}\)\d{3}-\d{2}-\d{2}$/', $phone)
+
+Email: стандартный формат
+Код: filter_var($email, FILTER_VALIDATE_EMAIL)
+
+Дата: формат ДД.ММ.ГГГГ
+Код: DateTime::createFromFormat('d.m.Y', $date) && $d->format('d.m.Y') === $date
+
+
+4. ЗАЩИТА ОТ XSS
+
+При выводе любых данных от пользователя:
+echo htmlspecialchars($userInput, ENT_QUOTES, 'UTF-8');
+
+5. ПОДГОТОВЛЕННЫЕ ЗАПРОСЫ
+
+С плейсхолдерами ?:
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+$stmt->execute([$id]);
+
+С именованными плейсхолдерами:
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = :id");
+$stmt->execute(['id' => $id]);
+
+6. СЕССИИ
+
+Запуск сессии (в самом начале файла):
+session_start();
+
+Сохранение данных:
+$_SESSION['user_id'] = 123;
+
+Проверка существования:
+if (isset($_SESSION['user_id'])) { ... }
+
+Удаление переменной:
+unset($_SESSION['user_id']);
+
+Уничтожение всей сессии:
+session_destroy();
+
+7. РАБОТА С ДАТАМИ
+
+Проверка формата ДД.ММ.ГГГГ:
+$d = DateTime::createFromFormat('d.m.Y', $date);
+if (!$d || $d->format('d.m.Y') !== $date) { ошибка }
+
+Текущая дата в MySQL:
+NOW() или CURRENT_TIMESTAMP
+
+8. РАЗДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЕЙ И АДМИНОВ
+
+Способ 1: поле role в таблице users
+ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') DEFAULT 'user';
+
+Способ 2: поле is_admin
+ALTER TABLE users ADD COLUMN is_admin TINYINT DEFAULT 0;
+
+Способ 3 (хардкод): проверка по логину
+$_SESSION['is_admin'] = ($login === 'Admin');
+
+9. ВНЕШНИЕ КЛЮЧИ
+
+При создании таблицы:
+FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+
+CASCADE — при удалении пользователя удалятся его заявки
+SET NULL — при удалении пользователя user_id станет NULL
+RESTRICT — запретит удаление пользователя, если есть заявки
+
+10. BOOTSTRAP 5 АДАПТИВНАЯ ВЕРСТКА (390x844)
+
+Подключение:
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+Контейнер с ограничением ширины:
+<div class="container" style="max-width: 390px; margin: 0 auto; padding: 15px;">
+
+Bottom navigation:
+<div class="position-fixed bottom-0 start-0 end-0 bg-white shadow" style="padding: 8px 0;">
+    <div class="d-flex justify-content-around">
+        <a href="profile.php" class="text-center"><i class="bi bi-house"></i><br>Главная</a>
+        <a href="create.php" class="text-center"><i class="bi bi-plus-circle"></i><br>Создать</a>
+        <a href="logout.php" class="text-center"><i class="bi bi-box-arrow-right"></i><br>Выход</a>
+    </div>
+</div>
+
+Иконки Bootstrap Icons:
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+11. ОТЛАДОЧНЫЕ ФУНКЦИИ
+
+Вывод переменной с остановкой:
+var_dump($variable); exit;
+
+Вывод с форматированием:
+echo '<pre>' . print_r($array, true) . '</pre>';
+
+Включение всех ошибок:
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+12. РЕДИРЕКТЫ
+
+Перенаправление на другую страницу:
+header('Location: page.php');
+exit;
+
+С задержкой (через meta-тег в HTML):
+<meta http-equiv="refresh" content="3;url=page.php">
+
+13. ОБРАБОТКА ФАЙЛОВЫХ ЗАГРУЗОК (если есть в билете)
+
+В форме: enctype="multipart/form-data"
+В PHP: $_FILES['file']['name'], $_FILES['file']['tmp_name']
+Перемещение: move_uploaded_file($tmp, $path)
+
+14. SQL ДЛЯ ДОБАВЛЕНИЯ АДМИНА
+
+SQL запрос:
+INSERT INTO users (login, password, fio, phone, email, role) VALUES ('admin', 'пароль_в_открытом_виде', 'Администратор', '8(999)999-99-99', 'admin@site.ru', 'admin');
+
+15. СТАТУСЫ ПО БИЛЕТАМ (русский → значение в БД)
+
+Новая → new
+Забронировано → booked
+Не забронировано → not_booked
+В производстве → in_production
+Завершена → completed
+В обработке → in_progress
+В работе → in_work
+Выполнена → done
+Доставляется → delivering
+Доставлено → delivered
+Идет обучение → studying
+Обучение завершено → completed
+На хранении → stored
+Выдано → issued
+Оформлена → registered
+Оплачено → paid
+В подготовке → preparing
+Проведено → conducted
+В подборе → selecting
+Закрыта → closed
+На контроле → monitoring
+В разработке → developing
+Готово → ready
+Исполнена → executed
+
+16. ТИПЫ ОШИБОК PDO
+
+1062 — дубликат уникального поля (логин уже существует)
+1146 — таблица не существует
+1045 — ошибка авторизации в БД
+1049 — база данных не существует
+2002 — сервер БД не найден
+
+
+17. ПРОВЕРКА SELECT И RADIO В ФОРМАХ
+
+SELECT с сохранением выбранного:
+<option value="val" <?= ($_POST['field'] ?? '') === 'val' ? 'selected' : '' ?>>Текст</option>
+
+RADIO с сохранением:
+<input type="radio" name="field" value="val" <?= ($_POST['field'] ?? '') === 'val' ? 'checked' : '' ?>>
+
+CHECKBOX с сохранением:
+<input type="checkbox" name="field" value="1" <?= isset($_POST['field']) ? 'checked' : '' ?>>
+
